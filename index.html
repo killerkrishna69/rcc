@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Restaurant Item List</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7f7; padding: 20px; }
+    h2 { text-align: center; }
+    .container { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+    .item { background: #fff; padding: 12px; border-radius: 10px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,0.1); cursor: pointer; user-select: none; }
+    .item.selected { background: #d1ffd1; border: 2px solid green; }
+    #cart { margin-top: 20px; background: #fff; padding: 16px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+    button { margin-top: 6px; padding: 8px 14px; border: none; background: green; color: #fff; border-radius: 8px; cursor: pointer; }
+    .controls { display:flex; gap:10px; margin-bottom:12px; }
+    input[type="search"]{ padding:8px; flex:1; border-radius:6px; border:1px solid #ccc }
+    .qty { font-size:0.9rem; color:#555 }
+    ul { padding-left: 18px; }
+    li { margin-bottom:6px; }
+    .remove-btn{ margin-left:8px; background:#d9534f; padding:3px 6px; border-radius:6px; color:#fff; border:none; cursor:pointer }
+  </style>
+</head>
+<body>
+  <h2>Restaurant Item List</h2>
+  <div class="controls">
+    <input id="search" type="search" placeholder="Search items..." />
+    <button id="clearCart">Clear Cart</button>
+  </div>
+
+  <div class="container" id="itemContainer"></div>
+
+  <div id="cart">
+    <h3>Selected Items</h3>
+    <ul id="cartList"></ul>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+      <button id="sendBtn">Send to WhatsApp</button>
+      <span class="qty">(<span id="cartCount">0</span> items)</span>
+    </div>
+  </div>
+
+  <script>
+    const items = [
+      'Color','Chini','Chapp masala','Meatty masala','Bhaj masala','Maschurian masala','Ginger garlic paste',
+      'Pirie','7*','Charina','Hdavia','Soup sauce','Vinegar','Champsim','Bulger','Chaw',
+      'Green Chilli sauce','Peed masale','Refined','Araroot','Soybean bari','Noodles Chaw','Atta',
+      'Ajino moto','Kali-Mirch','Namak',
+      'LaiMirch','Rumali roti',
+      'Pizza base 6"','Pizza base 7"','Pizza base 8"','Pizza box 7"','Pizza box 8" (5 pcs pkt)',
+      'Cheese disc','Cheese slice','Corn','Paneer','Sauce pouch','Chingappa pouch','Oregano 30 gm',
+      'Chili flakes 30 gm','Noodle packet','Nankeen (small)','Nankeen (large)','Mayonnaise','Namak',
+      'Pata gobhi','Onion','Shimla Mirch','Tomato','Kheera','Aalu','Mutter',
+      'Container 300ml','Container 450ml','Container 750ml','Plate 7"','Plate 8"','Plate 9"',
+      'Tissue paper','Spoon','Steel fork','Glass 6"','Glass 7"','Glass 8"','1*4*20','20*25','Rubber'
+    ];
+
+    const numberToSend = '9557662466';
+
+    const container = document.getElementById('itemContainer');
+    const cartList = document.getElementById('cartList');
+    const cartCount = document.getElementById('cartCount');
+    const searchInput = document.getElementById('search');
+    const sendBtn = document.getElementById('sendBtn');
+    const clearBtn = document.getElementById('clearCart');
+
+    // We'll keep cart as a Map of item -> count so removing/unhighlighting works correctly
+    const cartMap = new Map();
+
+    function renderItems(filter = ''){
+      container.innerHTML = '';
+      const f = filter.trim().toLowerCase();
+      items.forEach(item =>{
+        if(f && !item.toLowerCase().includes(f)) return;
+        const div = document.createElement('div');
+        div.className = 'item';
+        div.textContent = item;
+        div.dataset.item = item;
+        div.addEventListener('click', () => {
+          // increment count in cart
+          const prev = cartMap.get(item) || 0;
+          cartMap.set(item, prev + 1);
+          renderCart();
+          updateItemHighlight(item);
+        });
+        container.appendChild(div);
+        // if item already in cart (e.g., page re-render), keep highlight
+        if(cartMap.get(item) > 0) updateItemHighlight(item);
+      });
+    }
+
+    function updateItemHighlight(item){
+      // find the item div and mark selected if count>0 else remove
+      const selector = `.item[data-item]`;
+      const nodes = container.querySelectorAll(selector);
+      nodes.forEach(n => {
+        if(n.dataset.item === item){
+          if(cartMap.get(item) > 0) n.classList.add('selected');
+          else n.classList.remove('selected');
+        }
+      });
+      // update count badge
+      cartCount.textContent = Array.from(cartMap.values()).reduce((a,b)=>a+b,0);
+    }
+
+    function renderCart(){
+      cartList.innerHTML = '';
+      let totalItems = 0;
+      cartMap.forEach((count, item) => {
+        totalItems += count;
+        const li = document.createElement('li');
+        li.textContent = `${item} x ${count}`;
+        // remove one button
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = 'Remove one';
+        removeBtn.addEventListener('click', () => {
+          const prev = cartMap.get(item) || 0;
+          if(prev <= 1) cartMap.delete(item);
+          else cartMap.set(item, prev - 1);
+          renderCart();
+          // update highlight: if item removed fully, un-highlight
+          if(!cartMap.has(item)) updateItemHighlight(item);
+        });
+        li.appendChild(removeBtn);
+        cartList.appendChild(li);
+      });
+      cartCount.textContent = totalItems;
+    }
+
+    function clearCart(){
+      cartMap.clear();
+      renderCart();
+      // remove highlights
+      const nodes = container.querySelectorAll('.item.selected');
+      nodes.forEach(n => n.classList.remove('selected'));
+    }
+
+    function sendWhatsApp(){
+      const total = Array.from(cartMap.values()).reduce((a,b)=>a+b,0);
+      if(total === 0){
+        alert('Cart is empty. Please add items first.');
+        return;
+      }
+      let message = 'Order List:\n';
+      cartMap.forEach((count, item) => {
+        message += `- ${item} x ${count}\n`;
+      });
+      const encoded = encodeURIComponent(message);
+      const url = `https://wa.me/${numberToSend}?text=${encoded}`;
+      // create and click an anchor to avoid popup blockers
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    // wire up controls
+    sendBtn.addEventListener('click', sendWhatsApp);
+    clearBtn.addEventListener('click', clearCart);
+    searchInput.addEventListener('input', (e) => renderItems(e.target.value));
+
+    // initial render
+    renderItems();
+
+    // expose for compatibility
+    window.sendWhatsApp = sendWhatsApp;
+  </script>
+</body>
+</html>
